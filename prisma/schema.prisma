@@ -11,3 +11,37 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model ApiKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  keyHash   String   @unique
+  prefix    String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("api_keys")
+}
+
+model Scan {
+  id        String     @id @default(uuid()) @db.Uuid
+  requestId String     @unique
+  input     String     @db.Text
+  riskScore Float?
+  riskLevel String?
+  status    ScanStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@map("scans")
+}
+
+enum ScanStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}

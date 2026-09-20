@@ -6,11 +6,12 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.string().default('5000'),
-  FRONTEND_URL: z.string().url(),
+  // FRONTEND_URL: z.string().url(),
   DATABASE_URL: z.string(),
-  UPSTASH_REDIS_REST_URL: z.string(),
-  UPSTASH_REDIS_REST_TOKEN: z.string(),
-  UPSTASH_REDIS_URL: z.string(),
+  DIRECT_URL: z.string(),
+  // UPSTASH_REDIS_REST_URL: z.string(),
+  // UPSTASH_REDIS_REST_TOKEN: z.string(),
+  // UPSTASH_REDIS_URL: z.string(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
