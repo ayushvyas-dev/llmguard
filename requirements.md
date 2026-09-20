@@ -1503,25 +1503,22 @@ Do not build the dashboard before the API and evaluation system are working.
 A developer should eventually be able to do:
 
 ```typescript
-const response = await fetch(
-  "https://api.example.com/v1/scan",
-  {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      type: "prompt",
-      input: userInput
-    })
-  }
-);
+const response = await fetch('https://api.example.com/v1/scan', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    type: 'prompt',
+    input: userInput,
+  }),
+});
 
 const result = await response.json();
 
-if (result.decision === "block") {
-  throw new Error("Request blocked by LLM Guard");
+if (result.decision === 'block') {
+  throw new Error('Request blocked by LLM Guard');
 }
 ```
 
@@ -1529,10 +1526,10 @@ For an agent:
 
 ```typescript
 const result = await guard.validateToolCall({
-  tool: "github.deleteRepository",
+  tool: 'github.deleteRepository',
   arguments: {
-    repository: "company/project"
-  }
+    repository: 'company/project',
+  },
 });
 
 if (!result.allowed) {
