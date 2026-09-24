@@ -11,7 +11,7 @@ const envSchema = z.object({
   DIRECT_URL: z.string(),
   // UPSTASH_REDIS_REST_URL: z.string(),
   // UPSTASH_REDIS_REST_TOKEN: z.string(),
-  // UPSTASH_REDIS_URL: z.string(),
+  UPSTASH_REDIS_URL: z.string(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
