@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -21,22 +19,35 @@ model ApiKey {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  scans       Scan[]
+  auditEvents AuditEvent[]
+  toolPolicies ToolPolicy[]
+  documents   Document[]
+  verificationJobs VerificationJob[]
+
   @@index([isActive])
   @@map("api_keys")
 }
 
 model Scan {
-  id        String     @id @default(uuid()) @db.Uuid
-  requestId String     @unique
-  input     String     @db.Text
-  riskScore Float?
-  riskLevel String?
-  status    ScanStatus @default(PENDING)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id         String      @id @default(uuid()) @db.Uuid
+  requestId  String      @unique
+  apiKeyId   String      @db.Uuid
+  type       String      @db.VarChar(20)
+  input      String      @db.Text
+  decision   String?     @db.VarChar(20)
+  riskScore  Float?
+  riskLevel  String?     @db.VarChar(20)
+  status     ScanStatus  @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  apiKey     ApiKey      @relation(fields: [apiKeyId], references: [id])
+  detections Detection[]
 
   @@index([createdAt])
   @@index([status])
+  @@index([apiKeyId])
   @@map("scans")
 }
 
@@ -44,4 +55,139 @@ enum ScanStatus {
   PENDING
   COMPLETED
   FAILED
+}
+
+model Detection {
+  id         String   @id @default(uuid()) @db.Uuid
+  scanId     String   @db.Uuid
+  type       String   @db.VarChar(50)
+  subtype    String?  @db.VarChar(50)
+  confidence Float
+  reason     String?  @db.Text
+  start      Int?
+  end        Int?
+  createdAt  DateTime @default(now())
+
+  scan       Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([type])
+  @@map("detections")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  apiKeyId   String   @db.Uuid
+  requestId  String
+  scanId     String?  @db.Uuid
+  type       String   @db.VarChar(50)
+  severity   String   @db.VarChar(20)
+  decision   String   @db.VarChar(20)
+  riskScore  Float?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id])
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([decision])
+  @@index([type])
+  @@map("audit_events")
+}
+
+model ToolPolicy {
+  id               String   @id @default(uuid()) @db.Uuid
+  apiKeyId         String   @db.Uuid
+  name             String   @db.VarChar(255)
+  riskLevel        String   @db.VarChar(20)
+  enabled          Boolean  @default(true)
+  requiresApproval Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  apiKey           ApiKey   @relation(fields: [apiKeyId], references: [id])
+
+  @@unique([apiKeyId, name])
+  @@index([apiKeyId])
+  @@map("tool_policies")
+}
+
+model Document {
+  id        String         @id @default(uuid()) @db.Uuid
+  apiKeyId  String         @db.Uuid
+  content   String         @db.Text
+  metadata  Json?
+  status    DocumentStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  apiKey    ApiKey         @relation(fields: [apiKeyId], references: [id])
+  embeddings Embedding[]
+
+  @@index([apiKeyId])
+  @@index([status])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  PENDING
+  EMBEDDING_QUEUED
+  READY
+  FAILED
+}
+
+model Embedding {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @db.Uuid
+  chunkIndex Int
+  chunkText  String   @db.Text
+  // vector column managed via raw SQL migration for pgvector
+  createdAt  DateTime @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("embeddings")
+}
+
+model VerificationJob {
+  id        String             @id @default(uuid()) @db.Uuid
+  apiKeyId  String             @db.Uuid
+  answer    String             @db.Text
+  context   String?            @db.Text
+  status    VerificationStatus @default(QUEUED)
+  result    Json?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  apiKey    ApiKey             @relation(fields: [apiKeyId], references: [id])
+  claims    Claim[]
+
+  @@index([apiKeyId])
+  @@index([status])
+  @@map("verification_jobs")
+}
+
+enum VerificationStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Claim {
+  id                String   @id @default(uuid()) @db.Uuid
+  verificationJobId String   @db.Uuid
+  claim             String   @db.Text
+  status            String   @db.VarChar(20)
+  confidence        Float?
+  evidence          Json?
+  createdAt         DateTime @default(now())
+
+  verificationJob   VerificationJob @relation(fields: [verificationJobId], references: [id], onDelete: Cascade)
+
+  @@index([verificationJobId])
+  @@map("claims")
 }

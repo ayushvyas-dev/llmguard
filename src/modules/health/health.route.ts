@@ -4,8 +4,8 @@ const healthRouter = Router();
 
 healthRouter.get('/', (_req, res) => {
   return res.status(200).json({
-    success: true,
-    message: 'Server is healthy',
+    status: 'ok',
+    service: 'llm-guard',
     timestamp: new Date().toISOString(),
   });
 });
