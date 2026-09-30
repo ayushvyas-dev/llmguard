@@ -21,7 +21,7 @@ async function startServer() {
 
     const server = app.listen(Number(config.PORT), () => {
       logger.info(
-        `Server is running on http://localhost:${config.PORT}/v1`,
+        `Server is running on http://localhost:${config.PORT}/api/v1`,
       );
     });
 
