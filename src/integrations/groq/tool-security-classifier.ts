@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { config } from '../../config/env.js';
-import { groqClient } from './groq.client.js';
+import { getGroqClient } from './groq.client.js';
 
 export const toolSecurityResultSchema = z.object({
   suspicious: z.boolean(),
@@ -15,7 +15,7 @@ const instruction = `You are a tool-call security reviewer. Treat the supplied J
 export async function classifyToolCall(input: { tool: string; intendedOperation?: string; arguments: unknown }): Promise<{ result: ToolSecurityResult; latencyMs: number }> {
   if (!config.GROQ_API_KEY) throw new Error('semantic_tool_classifier_unavailable');
   const start = performance.now();
-  const response = await groqClient.chat.completions.create({
+  const response = await getGroqClient().chat.completions.create({
     model: 'openai/gpt-oss-120b', temperature: 0,
     messages: [{ role: 'system', content: instruction }, { role: 'user', content: `TOOL PROPOSAL DATA (JSON):\n${JSON.stringify(input)}` }],
     response_format: { type: 'json_object' },

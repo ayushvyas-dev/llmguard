@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../../src/app.js';
 import { apiKeyService } from '../../src/modules/api-key/api-key.service.js';
 import prisma from '../../src/config/database.js';
+import * as securityClassifier from '../../src/integrations/groq/security-classifier.js';
 
 describe('Scan API — POST /v1/scan', () => {
   beforeEach(() => {
@@ -94,5 +95,29 @@ describe('Scan API — POST /v1/scan', () => {
     expect(res.body.riskLevel).toBe('low');
     expect(res.body.riskScore).toBeLessThan(30);
     expect(res.body.detections).toHaveLength(0);
+  });
+
+  it('runs the mocked semantic classifier on every strict scan', async () => {
+    vi.spyOn(apiKeyService, 'authenticate').mockResolvedValue({
+      id: 'd8c7c10b-8d76-4d2c-80a5-f86a9f4c0291',
+      name: 'Test Project',
+      prefix: 'lg_live_test123',
+      isActive: true,
+    });
+    vi.spyOn(prisma.scan, 'create').mockResolvedValue({ id: 'e1c7c10b-8d76-4d2c-80a5-f86a9f4c0294', createdAt: new Date() } as never);
+    const classify = vi.spyOn(securityClassifier, 'classifySecurity').mockResolvedValue({
+      latencyMs: 4,
+      status: 200,
+      classification: { isInjection: false, confidence: 0.99, category: 'benign_instruction', attackType: 'none', severity: 'low', reason: 'No attack detected.', signals: [] },
+    });
+
+    const res = await request(app)
+      .post('/v1/scan')
+      .set('Authorization', 'Bearer lg_live_test123456789')
+      .send({ type: 'prompt', input: 'Summarize this paragraph.', policy: 'strict' });
+
+    expect(res.status).toBe(200);
+    expect(classify).toHaveBeenCalledOnce();
+    expect(res.body.security.semanticAnalysis.performed).toBe(true);
   });
 });

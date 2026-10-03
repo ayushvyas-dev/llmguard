@@ -1,4 +1,4 @@
-import { groqClient } from './groq.client.js';
+import { getGroqClient } from './groq.client.js';
 import { config } from '../../config/env.js';
 import logger from '../../config/logger.js';
 
@@ -21,7 +21,7 @@ export const groqService = {
     }
 
     try {
-      const response = await groqClient.chat.completions.create({
+      const response = await getGroqClient().chat.completions.create({
         model: DEFAULT_MODEL,
         messages: [
           {
@@ -92,7 +92,7 @@ Classify the status as one of:
 Respond ONLY with valid JSON:
 {"status": "supported" | "unsupported" | "uncertain", "confidence": number between 0 and 1, "reasoning": "brief explanation"}`;
 
-      const response = await groqClient.chat.completions.create({
+      const response = await getGroqClient().chat.completions.create({
         model: DEFAULT_MODEL,
         messages: [
           {

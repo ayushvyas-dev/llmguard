@@ -8,7 +8,8 @@
     "start": "tsx src/server.ts",
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "eval": "tsx tests/evaluation/evaluate.ts"
+    "eval": "tsx tests/evaluation/evaluate.ts",
+    "diagnose:groq": "tsx scripts/diagnose-groq.ts"
   },
   "keywords": [],
   "author": "",
