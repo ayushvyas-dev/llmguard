@@ -24,6 +24,10 @@ export const scanController = {
         apiKeyId: authReq.apiKey.id,
         ...(parsed.data.context ? { context: parsed.data.context } : {}),
         ...(parsed.data.policy ? { policy: parsed.data.policy } : {}),
+        ...(parsed.data.intendedOperation ? { intendedOperation: parsed.data.intendedOperation } : {}),
+        ...(parsed.data.operationRisk ? { operationRisk: parsed.data.operationRisk } : {}),
+        ...(parsed.data.sensitivity ? { sensitivity: parsed.data.sensitivity } : {}),
+        ...(parsed.data.semanticAnalysis !== undefined ? { semanticAnalysis: parsed.data.semanticAnalysis } : {}),
       });
 
       res.status(200).json(result);
@@ -40,6 +44,9 @@ export const scanController = {
         type: 'text', input: parsed.data.content, inputSource: parsed.data.source, inputTrust: parsed.data.trust, intendedOperation: parsed.data.intendedOperation,
         requestId: req.id, apiKeyId: authReq.apiKey.id,
         ...(parsed.data.policy ? { policy: parsed.data.policy } : {}),
+        ...(parsed.data.operationRisk ? { operationRisk: parsed.data.operationRisk } : {}),
+        ...(parsed.data.sensitivity ? { sensitivity: parsed.data.sensitivity } : {}),
+        ...(parsed.data.semanticAnalysis !== undefined ? { semanticAnalysis: parsed.data.semanticAnalysis } : {}),
       });
       res.status(200).json(result);
     } catch (error) { next(error); }

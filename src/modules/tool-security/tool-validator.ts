@@ -38,6 +38,9 @@ export function validateToolCall(
       };
     }
 
+    const mismatch = detectIntentMismatch(request);
+    if (mismatch) return mismatch;
+
     const riskLevel = registeredPolicy.riskLevel as RiskLevel;
     const requiresApproval = registeredPolicy.requiresApproval;
     const baseScore =
@@ -86,6 +89,9 @@ export function validateToolCall(
       ...(reason ? { reason } : {}),
     };
   }
+
+  const mismatch = detectIntentMismatch(request);
+  if (mismatch) return mismatch;
 
   // Fallback to pattern matching
   for (const patternPolicy of dangerousToolPatterns) {
@@ -158,8 +164,16 @@ function checkArgumentRisks(args: Record<string, unknown>): {
     return { additionalScore: 0, reasons: [] };
   }
 
-  for (const [key, value] of Object.entries(args)) {
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+  const stack: Array<{ key: string; value: unknown; depth: number }> = Object.entries(args).map(([key, value]) => ({ key, value, depth: 0 }));
+  let examined = 0;
+  while (stack.length > 0 && examined < 500) {
+    const { key, value, depth } = stack.pop()!;
+    examined++;
+    if (depth < 8 && value !== null && typeof value === 'object') {
+      for (const [childKey, childValue] of Object.entries(value)) stack.push({ key: childKey, value: childValue, depth: depth + 1 });
+      continue;
+    }
+    const stringValue = typeof value === 'string' ? value : String(value ?? '');
     for (const rule of dangerousArgumentPatterns) {
       if (rule.key.test(key) && rule.value.test(stringValue)) {
         additionalScore += rule.additionalRisk;
@@ -169,4 +183,20 @@ function checkArgumentRisks(args: Record<string, unknown>): {
   }
 
   return { additionalScore, reasons };
+}
+
+function detectIntentMismatch(request: ToolValidationRequest): EvaluatedToolResult | undefined {
+  if (!request.intendedOperation) return undefined;
+  const tool = request.tool.toLowerCase();
+  const intent = request.intendedOperation.toLowerCase();
+  const mismatchRules: Array<{ tool: RegExp; intent: RegExp; label: string }> = [
+    { tool: /email|send|notify|webhook|forward/, intent: /email|send|notify|forward|message|contact/, label: 'external communication' },
+    { tool: /transfer|payment|charge|purchase|refund|money/, intent: /transfer|payment|charge|purchase|refund|pay|buy/, label: 'financial action' },
+    { tool: /delete|remove|destroy|drop|purge|wipe/, intent: /delete|remove|destroy|drop|purge|cleanup|erase/, label: 'destructive action' },
+    { tool: /shell|exec|execute|command|sql|query|deploy|publish/, intent: /execute|run|query|database|shell|command|deploy|publish/, label: 'execution or data operation' },
+    { tool: /write|update|modify|create|insert|save|submit/, intent: /write|update|modify|create|insert|save|submit|edit/, label: 'state-changing action' },
+  ];
+  const rule = mismatchRules.find((candidate) => candidate.tool.test(tool) && !candidate.intent.test(intent));
+  if (!rule) return undefined;
+  return { allowed: false, requiresApproval: true, decision: 'review', riskLevel: 'high', riskScore: 75, reason: `Tool action may not match the caller's intended operation (${rule.label}); explicit approval is required.` };
 }

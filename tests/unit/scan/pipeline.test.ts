@@ -3,6 +3,7 @@ import prisma from '../../../src/config/database.js';
 import { auditService } from '../../../src/modules/audit/audit.service.js';
 import { scanService } from '../../../src/modules/scan/scan.service.js';
 import { classifySecurity } from '../../../src/integrations/groq/security-classifier.js';
+import { getSecurityPolicy, requestSamplingBucket } from '../../../src/modules/security-policy/security-policy.js';
 
 vi.mock('../../../src/integrations/groq/security-classifier.js', () => ({ classifySecurity: vi.fn() }));
 
@@ -45,5 +46,31 @@ describe('scan security pipeline', () => {
     const saved = vi.mocked(prisma.scan.create).mock.calls[0]?.[0]?.data;
     expect(saved?.input).toContain('INPUT_NOT_RETAINED');
     expect(saved?.input).not.toContain('hello');
+  });
+
+  it('routes clean text for high-impact operation context in balanced mode', async () => {
+    vi.mocked(classifySecurity).mockResolvedValue({
+      latencyMs: 6,
+      classification: { isInjection: false, confidence: 0.98, category: 'benign_instruction', attackType: 'none', severity: 'low', reason: 'No attack observed.', signals: [] },
+    });
+    const result = await scanService.scan({ type: 'prompt', input: 'Summarize this customer record.', requestId: 'risk-context-1', apiKeyId: 'key1', operationRisk: 'high', sensitivity: 'sensitive' });
+    expect(classifySecurity).toHaveBeenCalledOnce();
+    expect(result.security.routing.reasons).toContain('sensitive_operation');
+    expect(result.security.routing.reasons).toContain('sensitive_content');
+    expect(result.security.riskComponents.operation).toBeGreaterThan(0);
+  });
+
+  it('uses deterministic sampling to route low-signal requests', async () => {
+    vi.mocked(classifySecurity).mockResolvedValue({
+      latencyMs: 3,
+      classification: { isInjection: false, confidence: 0.7, category: 'benign_instruction', attackType: 'none', severity: 'low', reason: 'No attack observed.', signals: [] },
+    });
+    const rate = getSecurityPolicy('balanced').routing.samplingRate;
+    let requestId = 'sampling-candidate-0';
+    for (let i = 0; requestSamplingBucket(requestId) >= rate && i < 1000; i++) requestId = `sampling-candidate-${i + 1}`;
+    expect(requestSamplingBucket(requestId)).toBeLessThan(rate);
+    const result = await scanService.scan({ type: 'prompt', input: 'Please summarize this short note.', requestId, apiKeyId: 'key1' });
+    expect(classifySecurity).toHaveBeenCalledOnce();
+    expect(result.security.routing.reasons).toContain('deterministic_sampling');
   });
 });

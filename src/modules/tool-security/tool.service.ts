@@ -2,6 +2,9 @@ import prisma from '../../config/database.js';
 import { validateToolCall } from './tool-validator.js';
 import { auditService } from '../audit/audit.service.js';
 import { NotFoundError } from '../../shared/errors/index.js';
+import { config } from '../../config/env.js';
+import { classifyToolCall } from '../../integrations/groq/tool-security-classifier.js';
+import { sanitizeToolArguments } from './tool-argument-sanitizer.js';
 import type {
   ToolValidationRequest,
   ToolValidationResult,
@@ -23,7 +26,21 @@ export const toolService = {
       },
     });
 
-    const evaluated = validateToolCall(request, policy);
+    let evaluated = validateToolCall(request, policy);
+    let semanticAnalysis: NonNullable<ToolValidationResult['semanticAnalysis']> = { performed: false, provider: 'groq', latencyMs: null, confidence: null };
+    if (config.SEMANTIC_TOOL_ANALYSIS && (evaluated.riskScore >= 60 || (request.intendedOperation && evaluated.decision === 'review'))) {
+      const start = performance.now();
+      try {
+        const classification = await classifyToolCall({ tool: request.tool, ...(request.intendedOperation ? { intendedOperation: request.intendedOperation } : {}), arguments: sanitizeToolArguments(request.arguments) });
+        semanticAnalysis = { performed: true, provider: 'groq', latencyMs: classification.latencyMs, confidence: classification.result.confidence };
+        if (classification.result.suspicious && classification.result.confidence >= 0.7) {
+          const score = Math.max(evaluated.riskScore, Math.round(classification.result.confidence * 90));
+          evaluated = { ...evaluated, allowed: false, requiresApproval: true, decision: 'review', riskScore: score, riskLevel: score >= 90 ? 'critical' : score >= 70 ? 'high' : 'medium', reason: `Semantic tool review identified ${classification.result.category}; explicit approval is required.` };
+        }
+      } catch {
+        semanticAnalysis = { performed: true, provider: 'groq', latencyMs: Math.round(performance.now() - start), confidence: null, error: 'classification_unavailable_or_invalid' };
+      }
+    }
 
     // Create audit event
     const severity =
@@ -47,6 +64,7 @@ export const toolService = {
         allowed: evaluated.allowed,
         requiresApproval: evaluated.requiresApproval,
         reason: evaluated.reason ?? null,
+        semanticAnalysis,
       },
     });
 
@@ -59,6 +77,7 @@ export const toolService = {
       riskScore: evaluated.riskScore,
       tool: request.tool,
       ...(evaluated.reason ? { reason: evaluated.reason } : {}),
+      semanticAnalysis,
     };
 
     return result;

@@ -20,6 +20,21 @@ describe('Tool Security Validator', () => {
     expect(result.allowed).toBe(false);
   });
 
+  it('requires approval for sensitive named tools and mismatched intent', () => {
+    const sensitive = validateToolCall({ tool: 'transfer_money', arguments: { amount: 50 }, intendedOperation: 'summarize a news article' });
+    expect(sensitive.requiresApproval).toBe(true);
+    expect(sensitive.decision).toBe('review');
+    expect(sensitive.allowed).toBe(false);
+  });
+
+  it('flags tool actions inconsistent with the supplied operation', () => {
+    const result = validateToolCall({ tool: 'mail.sendEmail', arguments: { to: 'team@example.com' }, intendedOperation: 'summarize this page' });
+    expect(result.decision).toBe('review');
+    expect(result.reason).toContain('intended operation');
+    const aligned = validateToolCall({ tool: 'mail.sendEmail', arguments: { to: 'team@example.com' }, intendedOperation: 'email the approved summary' });
+    expect(aligned.reason).not.toContain('intended operation');
+  });
+
   it('blocks or flags destructive operations for human approval', () => {
     const result = validateToolCall({
       tool: 'github.deleteRepository',
@@ -41,6 +56,12 @@ describe('Tool Security Validator', () => {
 
     expect(result.requiresApproval).toBe(true);
     expect(result.riskScore).toBeGreaterThanOrEqual(25);
+  });
+
+  it('detects dangerous nested arguments', () => {
+    const result = validateToolCall({ tool: 'custom.process', arguments: { options: { nested: { shell: 'rm -rf /' } } } });
+    expect(result.decision).toBe('review');
+    expect(result.requiresApproval).toBe(true);
   });
 
   it('enforces registered policy when tool is disabled', () => {

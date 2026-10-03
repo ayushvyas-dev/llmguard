@@ -10,4 +10,7 @@ export interface InternalScanRequest {
   inputSource?: string;
   inputTrust?: 'trusted' | 'untrusted';
   intendedOperation?: string;
+  operationRisk?: 'low' | 'medium' | 'high' | 'critical';
+  sensitivity?: 'public' | 'internal' | 'sensitive' | 'critical';
+  semanticAnalysis?: boolean;
 }

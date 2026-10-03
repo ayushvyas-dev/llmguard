@@ -75,15 +75,17 @@ PostgreSQL is the durable store. Redis carries queue and rate-limit state. The H
 
 #### Security scan
 
-`POST /v1/scan` gets a request ID, passes through rate limiting, API-key authentication, and request validation. The scan service runs the injection and PII detectors, then the risk service calculates the decision. The scan and detections are stored in PostgreSQL; an audit event is created asynchronously; the response includes the decision and detections.
+`POST /v1/scan` gets a request ID, passes through rate limiting, API-key authentication, and request validation. The scan service normalizes separate detector copies, runs injection/PII checks, routes semantic analysis using security context and policy, aggregates risk, and stores the decision and detections. Audit events are created asynchronously.
 
 Scans may call Groq according to the selected policy. They do not call Gemini. Prompt contents are not persisted; the database stores a length placeholder and structured detections.
 
 `POST /v1/scan` accepts optional `context: [{source, trust, content}]`; mark retrieved/web/email/document content `untrusted`. `POST /v1/scan/content` is a convenience form with `content`, `source`, `trust`, and `intendedOperation` (trust defaults to `untrusted`). Untrusted instruction-like text is tagged as indirect evidence.
 
-Groq is called under `strict` for every scan, under `balanced` when deterministic or indirect suspicious signals exist, and under `permissive` for strong rule signals. Its fixed instruction treats the JSON-delimited input as data, it has no tools or application secrets, and Zod validates every response. Provider failures default to `review`; `CLASSIFIER_FAILURE_MODE` supports `fail_open`, `fail_closed`, and `review_on_failure`. The result exposes attempted status, latency, confidence, policy, component scores, reasons, and decision.
+Groq is called under `strict` for every scan. `balanced` uses intelligent routing: deterministic signals, untrusted content, high-impact operations, sensitive content, explicit caller requests, ambiguity/security relevance cues, or stable request-ID sampling can trigger it. `permissive` routes high-risk signals, untrusted/sensitive/high-impact requests, explicit requests, and stable sampling. `SEMANTIC_SAMPLING_RATE` defaults to 0.10; `SEMANTIC_ANALYZE_UNTRUSTED`, `SEMANTIC_ANALYZE_SENSITIVE`, and `SEMANTIC_ANALYZE_AMBIGUOUS` control those routes. The sampling bucket is deterministic for a request ID. The classifier receives JSON-delimited data under a fixed instruction, has no tools or application secrets, and Zod validates every response. Provider failures default to `review`; `CLASSIFIER_FAILURE_MODE` supports `fail_open`, `fail_closed`, and `review_on_failure`. The result exposes whether it ran, latency, confidence, routing reasons, policy, component scores, and decision.
 
-Risk uses the maximum deterministic confidence scaled by 86, or semantic confidence scaled by severity, then adds 12 for instruction-like untrusted content and 15 when PII is found, capped at 100. Taking a maximum for correlated rules avoids multiplying risk from duplicate matches. Centralized thresholds are balanced (allow through 24, review through 64), strict (14/44), and permissive (34/74). These are tuning values, not calibrated probabilities. The submitted content is not retained; `Scan.input` stores only a length placeholder.
+Risk uses the maximum deterministic confidence scaled by 86, semantic confidence scaled by severity, or provider-failure floor, then adds centrally configured uplifts for instruction-like untrusted content (12), PII (15), operation impact (0/5/12/18), and sensitivity (0/3/8/12), capped at 100. Taking a maximum for correlated rules avoids multiplying risk from duplicate matches. Centralized thresholds are balanced (allow through 24, review through 64), strict (14/44), and permissive (34/74). Uplifts and thresholds are policy tuning values, not calibrated probabilities. `operationRisk` and `sensitivity` are caller supplied context; classify accurately. The submitted content is not retained; `Scan.input` stores only a length placeholder.
+
+The request may also specify `intendedOperation`, `operationRisk` (`low` through `critical`), `sensitivity` (`public`, `internal`, `sensitive`, `critical`), and `semanticAnalysis: true` to force semantic review. These fields affect routing and risk context; they do not authorize actions.
 
 Example:
 
@@ -100,7 +102,7 @@ This risk signal helps a host preserve `DATA_TO_USE` versus `INSTRUCTIONS_NOT_TO
 
 #### Tool validation
 
-`POST /v1/tools/validate` checks the caller's registered policy when one exists, then evaluates enabled status, risk level, approval requirements, and suspicious arguments. Without a registered policy, built-in dangerous-tool and argument patterns apply; otherwise only clearly read-only names are implicitly allowed and unknown tools return `review`. Register policies for all writes, external communication, payments, shell, file, and database tools. The host must enforce decisions; this API never executes a tool.
+`POST /v1/tools/validate` checks the caller's registered policy when one exists, then evaluates enabled status, risk level, approval requirements, nested suspicious arguments, and optional `intendedOperation` consistency. Sensitive named tools such as `send_email`, `delete_file`, `execute_sql`, `run_shell`, and `transfer_money` require approval by default. Without a registered policy, built-in dangerous-tool and argument patterns apply; otherwise only clearly read-only names are implicitly allowed and unknown tools return `review`. Register policies for all writes, external communication, payments, shell, file, and database tools. Set `SEMANTIC_TOOL_ANALYSIS=true` to enable Groq review for elevated-risk or intent-sensitive calls; obvious credential keys and PII-like argument values are redacted before provider analysis. The host must enforce decisions; this API never executes a tool.
 
 #### Claim verification
 
@@ -204,7 +206,7 @@ Injection, PII, normalization, risk scoring, and tool checks remain local. Groq 
 - Missing tool policy uses built-in dangerous-tool and argument patterns. Register explicit policies for sensitive tools.
 - Verification and embedding jobs require their configured providers; there is no offline equivalent. Job status can report failure.
 - Redis is required at server startup for queues and rate limiting; there is no in-memory queue fallback.
-- The current scan path persists raw input. Do not send production secrets or sensitive user data until persistence, redaction, and retention behavior meet the deployment's requirements.
+- Scan input is not retained, but detector and reason metadata remain sensitive operational records; control access and retention.
 
 ## Project setup
 
@@ -214,7 +216,7 @@ Injection, PII, normalization, risk scoring, and tool checks remain local. Groq 
 - Docker Compose, or PostgreSQL with pgvector and Redis
 - Groq and Gemini API keys for claim verification and document embedding
 
-Rule-based scans do not require provider API keys.
+Rule-based scans do not require provider API keys. With the default balanced mode, suspicious, sensitive, untrusted, sampled, or explicitly requested scans use Groq when configured; missing/unavailable Groq is reported and routed by `CLASSIFIER_FAILURE_MODE`.
 
 ### 1. Start PostgreSQL and Redis
 
@@ -240,6 +242,13 @@ UPSTASH_REDIS_URL="redis://localhost:6379"
 GROQ_API_KEY=""
 GEMINI_API_KEY=""
 API_KEY_PEPPER="replace-with-a-random-private-value"
+SECURITY_MODE="balanced"
+CLASSIFIER_FAILURE_MODE="review_on_failure"
+SEMANTIC_SAMPLING_RATE="0.10"
+SEMANTIC_ANALYZE_UNTRUSTED="true"
+SEMANTIC_ANALYZE_SENSITIVE="true"
+SEMANTIC_ANALYZE_AMBIGUOUS="true"
+SEMANTIC_TOOL_ANALYSIS="false"
 ```
 
 The config accepts `REDIS_URL` as a fallback to `UPSTASH_REDIS_URL`. Keep provider credentials and `.env` out of version control. Replace the example pepper outside local development.

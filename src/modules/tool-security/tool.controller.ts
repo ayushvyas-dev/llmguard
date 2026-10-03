@@ -18,7 +18,7 @@ export const toolController = {
       const result = await toolService.validate(
         authReq.apiKey.id,
         req.id,
-        parsed.data,
+        { tool: parsed.data.tool, arguments: parsed.data.arguments, ...(parsed.data.intendedOperation ? { intendedOperation: parsed.data.intendedOperation } : {}) },
       );
 
       res.status(200).json(result);

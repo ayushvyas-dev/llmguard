@@ -12,6 +12,13 @@ export interface DefaultToolPolicy {
 }
 
 export const dangerousToolPatterns: DefaultToolPolicy[] = [
+  {
+    pattern: /(^|[._:-])(send[_-]?email|sendemail|email[_-]?send|delete[_-]?file|deletefile|execute[_-]?sql|executesql|run[_-]?shell|runshell|transfer[_-]?money|transfermoney)([._:-]|$)/i,
+    riskLevel: 'critical',
+    requiresApproval: true,
+    reason: 'Sensitive external, destructive, execution, or financial tool requires approval.',
+    riskScore: 95,
+  },
   // Destructive operations
   {
     pattern: /\.(delete|remove|destroy|drop|purge|erase|wipe)/i,
