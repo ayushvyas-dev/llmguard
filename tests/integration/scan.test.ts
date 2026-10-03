@@ -53,7 +53,7 @@ describe('Scan API — POST /v1/scan', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.decision).toBe('block');
-    expect(res.body.riskLevel).toBe('critical');
+    expect(res.body.riskLevel).toBe('high');
     expect(res.body.riskScore).toBeGreaterThanOrEqual(70);
     expect(res.body.detections.length).toBeGreaterThan(0);
     expect(res.body.detections[0].type).toBe('prompt_injection');

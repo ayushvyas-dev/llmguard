@@ -14,6 +14,12 @@ describe('Tool Security Validator', () => {
     expect(result.riskLevel).toBe('low');
   });
 
+  it('reviews unknown tools by default', () => {
+    const result = validateToolCall({ tool: 'custom.performAction', arguments: {} });
+    expect(result.decision).toBe('review');
+    expect(result.allowed).toBe(false);
+  });
+
   it('blocks or flags destructive operations for human approval', () => {
     const result = validateToolCall({
       tool: 'github.deleteRepository',

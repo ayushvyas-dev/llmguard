@@ -117,6 +117,11 @@ export function validateToolCall(
     }
   }
 
+  // Only clearly read-only operations are implicitly allowed. Hosts should register policies for all other tools.
+  if (!/(^|\.)(get|list|read|search|fetch|lookup|describe)([A-Z_.:-]|$)/i.test(request.tool)) {
+    return { allowed: false, requiresApproval: true, decision: 'review', riskLevel: 'high', riskScore: 75, reason: `Tool '${request.tool}' has no registered policy and is not an implicitly read-only operation.` };
+  }
+
   // Check argument risks even for unclassified tools
   const argRisks = checkArgumentRisks(request.arguments);
   if (argRisks.additionalScore > 0) {

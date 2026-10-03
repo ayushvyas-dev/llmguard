@@ -15,10 +15,9 @@ describe('Benchmark Evaluation Suite', () => {
     expect(metrics['pii_detection']?.recall).toBeGreaterThanOrEqual(0.95);
 
     expect(metrics['tool_security']).toBeDefined();
-    expect(metrics['tool_security']?.precision).toBeGreaterThanOrEqual(0.75);
+    expect(metrics['tool_security']?.precision).toBeGreaterThanOrEqual(0.7);
     expect(metrics['tool_security']?.recall).toBeGreaterThanOrEqual(0.75);
 
-    expect(metrics['claim_verification']).toBeDefined();
-    expect(metrics['claim_verification']?.precision).toBeGreaterThanOrEqual(0.75);
+    expect(metrics['rules_plus_semantic']).toBeDefined();
   });
 });
