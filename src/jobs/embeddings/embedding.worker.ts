@@ -4,33 +4,31 @@ import prisma from '../../config/database.js';
 import logger from '../../config/logger.js';
 import { embeddingService } from '../../integrations/gemini/embedding.service.js';
 import type { EmbeddingJobData } from './embedding.queue.js';
+import { randomUUID } from 'node:crypto';
+import { validateEmbedding } from '../../integrations/gemini/embedding.service.js';
 
 export async function processEmbeddingJob(data: EmbeddingJobData): Promise<void> {
   const { documentId, content } = data;
 
   try {
-    // Split content into chunks
+    const document = await prisma.document.findFirst({ where: { id: documentId, apiKeyId: data.apiKeyId } });
+    if (!document) throw new Error('Embedding job document was not found for this API key');
+
     const chunks = chunkText(content, 500, 50);
+    if (chunks.length === 0) throw new Error('Cannot embed an empty document');
+    const vectors = await Promise.all(chunks.map(async (chunk) => validateEmbedding(await embeddingService.generateEmbedding(chunk))));
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i] ?? '';
-      // Generate embedding vector
-      await embeddingService.generateEmbedding(chunk);
-
-      // Persist chunk to database
-      await prisma.embedding.create({
-        data: {
-          documentId,
-          chunkIndex: i,
-          chunkText: chunk,
-        },
-      });
-    }
-
-    // Update document status to READY
-    await prisma.document.update({
-      where: { id: documentId },
-      data: { status: 'READY' },
+    await prisma.$transaction(async (tx) => {
+      await tx.embedding.deleteMany({ where: { documentId } });
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]!;
+        const vector = JSON.stringify(vectors[i]);
+        await tx.$executeRaw`
+          INSERT INTO "embeddings" ("id", "documentId", "chunkIndex", "chunkText", "embedding", "createdAt")
+          VALUES (${randomUUID()}::uuid, ${documentId}::uuid, ${i}, ${chunk}, ${vector}::vector, CURRENT_TIMESTAMP)
+        `;
+      }
+      await tx.document.update({ where: { id: documentId }, data: { status: 'READY' } });
     });
 
     logger.info({ documentId, chunksCount: chunks.length }, 'Embedding job completed successfully');
@@ -68,6 +66,8 @@ export function startEmbeddingWorker(): Worker<EmbeddingJobData> {
 }
 
 function chunkText(text: string, chunkSize = 500, overlap = 50): string[] {
+  text = text.trim();
+  if (!text) return [];
   if (text.length <= chunkSize) {
     return [text];
   }

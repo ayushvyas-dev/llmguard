@@ -69,6 +69,7 @@ Respond ONLY with a valid JSON object in the following format:
   async verifyClaim(
     claim: string,
     evidenceTexts: string[],
+    options: { useProvider?: boolean } = {},
   ): Promise<VerifiedClaimOutput> {
     if (evidenceTexts.length === 0) {
       return {
@@ -78,7 +79,7 @@ Respond ONLY with a valid JSON object in the following format:
       };
     }
 
-    if (!config.GROQ_API_KEY) {
+    if (!config.GROQ_API_KEY || options.useProvider === false) {
       return fallbackVerifyClaim(claim, evidenceTexts);
     }
 
@@ -162,46 +163,12 @@ function fallbackExtractClaims(text: string): string[] {
  * Fallback claim verifier using basic token overlap when Groq is not configured
  */
 function fallbackVerifyClaim(
-  claim: string,
-  evidenceTexts: string[],
+  _claim: string,
+  _evidenceTexts: string[],
 ): VerifiedClaimOutput {
-  const claimWords = claim
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter((w) => w.length > 3);
-  if (claimWords.length === 0) {
-    return {
-      status: 'uncertain',
-      confidence: 0.5,
-      reasoning:
-        'Claim is too short or ambiguous to verify without external LLM.',
-    };
-  }
-
-  const combinedEvidence = evidenceTexts.join(' ').toLowerCase();
-  const matchedWords = claimWords.filter((w) => combinedEvidence.includes(w));
-  const ratio = matchedWords.length / claimWords.length;
-
-  if (ratio >= 0.75) {
-    return {
-      status: 'supported',
-      confidence: 0.85,
-      reasoning: 'Evidence closely aligns with the factual terms in the claim.',
-    };
-  }
-
-  if (ratio < 0.25) {
-    return {
-      status: 'uncertain',
-      confidence: 0.5,
-      reasoning: 'Insufficient evidence to verify the claim.',
-    };
-  }
-
   return {
     status: 'uncertain',
-    confidence: 0.6,
-    reasoning: 'Partial evidence match; claim cannot be definitively verified.',
+    confidence: 0.5,
+    reasoning: 'The claim could not be semantically checked; lexical overlap is insufficient to establish support or contradiction.',
   };
 }

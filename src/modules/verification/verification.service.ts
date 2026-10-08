@@ -22,12 +22,17 @@ export const verificationService = {
       },
     });
 
-    await enqueueVerificationJob({
-      verificationJobId: job.id,
-      apiKeyId,
-      answer: input.answer,
-      context: input.context,
-    });
+    try {
+      await enqueueVerificationJob({
+        verificationJobId: job.id,
+        apiKeyId,
+        answer: input.answer,
+        context: input.context,
+      });
+    } catch (error) {
+      await prisma.verificationJob.update({ where: { id: job.id }, data: { status: 'FAILED' } });
+      throw error;
+    }
 
     return {
       jobId: job.id,
@@ -74,11 +79,12 @@ export const verificationService = {
       },
     });
 
-    await enqueueEmbeddingJob({
-      documentId: doc.id,
-      apiKeyId,
-      content: input.content,
-    });
+    try {
+      await enqueueEmbeddingJob({ documentId: doc.id, apiKeyId, content: input.content });
+    } catch (error) {
+      await prisma.document.update({ where: { id: doc.id }, data: { status: 'FAILED' } });
+      throw error;
+    }
 
     return {
       documentId: doc.id,

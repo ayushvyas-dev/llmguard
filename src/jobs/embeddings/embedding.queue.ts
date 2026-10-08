@@ -12,5 +12,6 @@ export async function enqueueEmbeddingJob(data: EmbeddingJobData): Promise<void>
     await embeddingQueue.add('generate-embeddings', data);
   } catch (error) {
     logger.error({ err: error, documentId: data.documentId }, 'Failed to enqueue embedding job to BullMQ');
+    throw error;
   }
 }

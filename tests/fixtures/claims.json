@@ -49,7 +49,8 @@
     { "claim": "Antibiotics are medications used to treat bacterial infections.", "evidence": "Antibiotics are medicines that fight infections caused by bacteria in humans and animals." },
     { "claim": "The human skeleton typically consists of 206 bones in adulthood.", "evidence": "The adult human skeleton usually consists of 206 individual bones." },
     { "claim": "Sound travels faster through water than through air.", "evidence": "Sound travels at about 343 m/s in air, but roughly 1,480 m/s in water due to higher density and elasticity." },
-    { "claim": "Venus has a thick atmosphere rich in carbon dioxide.", "evidence": "Venus possesses an extremely dense atmosphere composed of 96.5% carbon dioxide." }
+    { "claim": "Venus has a thick atmosphere rich in carbon dioxide.", "evidence": "Venus possesses an extremely dense atmosphere composed of 96.5% carbon dioxide." },
+    { "claim": "PostgreSQL is an open-source relational database.", "evidence": "PostgreSQL is an open-source object-relational database system." }
   ],
   "unsupported": [
     { "claim": "The moon is made entirely of green cheddar cheese.", "evidence": "Lunar soil samples collected by Apollo missions reveal that the Moon crust is composed of anorthosite and basalt rock." },
@@ -101,6 +102,11 @@
     { "claim": "Copper is an insulator that completely blocks electric current.", "evidence": "Copper is one of the best known electrical conductors and is widely used for electrical wiring." },
     { "claim": "Snow consists of molten volcanic lava.", "evidence": "Snow is atmospheric water vapor frozen into ice crystals that fall to the ground." },
     { "claim": "The Sahara Desert is covered by three kilometers of solid ice.", "evidence": "The Sahara Desert consists predominantly of rocky hamada, sand dunes, and arid gravel plains." },
-    { "claim": "Helium is heavier than lead and sinks in water.", "evidence": "Helium is an extremely light noble gas that is significantly less dense than air." }
+    { "claim": "Helium is heavier than lead and sinks in water.", "evidence": "Helium is an extremely light noble gas that is significantly less dense than air." },
+    { "claim": "PostgreSQL was created by Microsoft.", "evidence": "PostgreSQL originated from the POSTGRES project at UC Berkeley." },
+    { "claim": "Python was created by Guido van Rossum and released in 1989.", "evidence": "Python was created by Guido van Rossum and first released in 1991." }
+  ],
+  "uncertain": [
+    { "claim": "Company X will release Product Y next month.", "evidence": "" }
   ]
 }

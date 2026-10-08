@@ -11,6 +11,7 @@ import type { ClaimVerificationItem } from '../../modules/verification/verificat
 
 export async function processVerificationJob(data: VerificationJobData): Promise<void> {
   const { verificationJobId, apiKeyId, answer, context } = data;
+  const totalStarted = performance.now();
 
   try {
     // 1. Mark status as PROCESSING
@@ -20,13 +21,27 @@ export async function processVerificationJob(data: VerificationJobData): Promise
     });
 
     // 2. Extract claims
-    const claims = await claimExtractor.extract(answer, context);
+    const extractionStarted = performance.now();
+    const extractedClaims = await claimExtractor.extract(answer, context);
+    const claims = [...new Map(
+      extractedClaims
+        .map((claim) => claim.trim().replace(/\s+/g, ' '))
+        .filter(Boolean)
+        .map((claim) => [claim.toLocaleLowerCase(), claim] as const),
+    ).values()];
+    const extractionLatencyMs = Math.round(performance.now() - extractionStarted);
     const verifiedItems: ClaimVerificationItem[] = [];
+    const retrievalLatencies: number[] = [];
+    const verificationLatencies: number[] = [];
 
     // 3. Retrieve evidence and verify each claim
     for (const claimText of claims) {
+      const retrievalStarted = performance.now();
       const evidence = await evidenceRetriever.retrieve(apiKeyId, claimText);
+      retrievalLatencies.push(performance.now() - retrievalStarted);
+      const verificationStarted = performance.now();
       const verified = await claimVerifier.verify(claimText, evidence);
+      verificationLatencies.push(performance.now() - verificationStarted);
       verifiedItems.push(verified);
 
       // Persist individual claim to database
@@ -52,7 +67,15 @@ export async function processVerificationJob(data: VerificationJobData): Promise
       },
     });
 
-    logger.info({ verificationJobId, claimsCount: verifiedItems.length }, 'Verification job completed successfully');
+    logger.info({
+      verificationJobId,
+      claimsCount: verifiedItems.length,
+      extractionLatencyMs,
+      retrievalLatencyMs: retrievalLatencies.map(Math.round),
+      verificationLatencyMs: verificationLatencies.map(Math.round),
+      totalLatencyMs: Math.round(performance.now() - totalStarted),
+      embeddingProviderCalls: verifiedItems.length,
+    }, 'Verification job completed successfully');
   } catch (error) {
     logger.error({ err: error, verificationJobId }, 'Verification job failed');
     await prisma.verificationJob.update({

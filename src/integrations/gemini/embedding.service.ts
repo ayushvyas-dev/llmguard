@@ -1,10 +1,12 @@
 import { geminiClient } from './gemini.client.js';
 import { config } from '../../config/env.js';
-import logger from '../../config/logger.js';
+
+export const EMBEDDING_DIMENSION = 768;
+export const EMBEDDING_MODEL = 'text-embedding-004';
 
 export const embeddingService = {
   /**
-   * Generates a 768-dimensional embedding vector for the given text.
+   * Generates and validates the configured model's 768-dimensional vector.
    */
   async generateEmbedding(text: string): Promise<number[]> {
     if (!config.GEMINI_API_KEY) {
@@ -13,20 +15,21 @@ export const embeddingService = {
 
     try {
       const response = await geminiClient.models.embedContent({
-        model: 'text-embedding-004',
+        model: EMBEDDING_MODEL,
         contents: text,
       });
 
       const values = response.embeddings?.[0]?.values;
-      if (Array.isArray(values) && values.length > 0) {
-        return values;
+      if (Array.isArray(values)) {
+        return validateEmbedding(values);
       }
-
-      logger.warn('Gemini embedding returned empty values, using deterministic fallback');
-      return generateDeterministicEmbedding(text);
+      throw new Error('Gemini embedding returned no vector');
     } catch (error) {
-      logger.error({ err: error }, 'Gemini embedding generation failed, using fallback');
-      return generateDeterministicEmbedding(text);
+      // Provider errors can include request details; avoid logging or rethrowing
+      // potentially sensitive provider payloads and credentials.
+      if (error instanceof Error && error.message.startsWith('Embedding must contain')) throw error;
+      void error;
+      throw new Error('Gemini embedding generation failed');
     }
   },
 
@@ -57,6 +60,13 @@ export const embeddingService = {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   },
 };
+
+export function validateEmbedding(vector: number[]): number[] {
+  if (vector.length !== EMBEDDING_DIMENSION || vector.some((value) => !Number.isFinite(value))) {
+    throw new Error(`Embedding must contain exactly ${EMBEDDING_DIMENSION} finite values`);
+  }
+  return vector;
+}
 
 /**
  * Generates a reproducible pseudo-random 768-dim normalized embedding based on character tokens.

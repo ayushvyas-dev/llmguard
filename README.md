@@ -27,7 +27,7 @@ LLM Guard does not execute agent tools itself. The integrating application must 
 | Validation | Zod |
 | Database | PostgreSQL |
 | ORM | Prisma 7 |
-| Vector extension | pgvector (enabled in the database image; see current limitation below) |
+| Vector extension | pgvector (768-dimensional cosine search with HNSW index) |
 | Background jobs | BullMQ + Redis |
 | LLM tasks | Groq API |
 | Embeddings | Gemini API |
@@ -135,7 +135,7 @@ ApiKey
 
 Records are scoped to an API key. API key material is stored as a hash generated with `API_KEY_PEPPER`; the raw key should only be shown when it is created. PostgreSQL migrations are committed under `prisma/migrations`.
 
-The database image enables pgvector and migrations include vector-related SQL, but the current evidence retriever loads a caller's ready documents and computes cosine similarity in application code. It also regenerates embeddings for stored chunks during retrieval. This is an MVP implementation and is not an efficient pgvector search path for large evidence collections.
+The database migration enables pgvector and stores each Gemini `text-embedding-004` output in a `vector(768)` column. An HNSW cosine index supports tenant-scoped top-K searches. Each claim creates one query embedding and one PostgreSQL vector query; stored chunk vectors are not regenerated during retrieval. Prisma manages the relational model while raw, parameterized SQL handles the pgvector column and distance operation.
 
 ## API surface
 
@@ -180,7 +180,7 @@ The API has distinct feature modules but runs as one service. That keeps local s
 
 ### PostgreSQL and Prisma
 
-PostgreSQL fits the relational records used here: scans have detections, API keys own policies and documents, and verification jobs have claims. Transactions, constraints, and indexes are useful for keeping those records consistent. pgvector is available in the database stack so evidence vectors can eventually live beside the documents. The current retriever has not yet been switched to vector SQL, so it does not get pgvector's scalable similarity search yet.
+PostgreSQL fits the relational records used here: scans have detections, API keys own policies and documents, and verification jobs have claims. Transactions, constraints, and indexes keep those records consistent. Evidence vectors live beside document chunks in pgvector, and a cosine HNSW index supports retrieval. Since Prisma does not natively model pgvector, migration SQL creates the typed vector column and parameterized raw SQL performs inserts and similarity queries.
 
 Prisma provides typed access and migrations, and the Neon adapter supports managed PostgreSQL connections. The tradeoff is reliance on generated client code and Prisma's adapter behavior; vector-specific SQL still needs migrations or raw queries.
 
@@ -281,10 +281,20 @@ The Compose API environment contains development defaults. Replace its credentia
 ```bash
 npm test       # Vitest unit and integration tests
 npm run build  # TypeScript type check
-npm run eval   # Fixture-based detector evaluation
+npm run eval   # Fixture-based security and claim-verifier evaluation
 ```
 
-Fixtures live in `tests/fixtures`; the runner is `tests/evaluation/evaluate.ts`. Offline runs measure rules-only behavior against adversarial and benign fixtures. To compare rules plus live Groq on the same fixtures, set `EVAL_SEMANTIC=1` with `GROQ_API_KEY`; this makes provider calls and reports actual invocations, failures, and latency. Cost is left unestimated until token pricing is configured. Benchmarks are not production guarantees.
+Fixtures live in `tests/fixtures`; the runner is `tests/evaluation/evaluate.ts`. The claim fixture currently contains 51 supported, 52 unsupported, and 1 uncertain example. Claim verification runs each labeled claim with its fixture evidence through the configured verifier and reports accuracy, per-class precision/recall/F1, confusion matrix, and verifier latency. Retrieval, extraction, similarity, and full-pipeline latency metrics show `N/A` in this fixture-only benchmark because it does not connect to PostgreSQL or call the claim extractor. To benchmark real retrieval, run an integration benchmark against a migrated pgvector database. Offline security runs measure local rules against adversarial and benign fixtures. To compare rules plus live Groq on the same security fixtures, set `EVAL_SEMANTIC=1` with `GROQ_API_KEY`; this makes provider calls and reports actual invocations, failures, and latency. Cost is left unestimated until token pricing is configured. Benchmarks are not production guarantees.
+
+Most recent offline evaluation (`npm run eval`, October 8, 2026):
+
+| Benchmark | Samples | Precision | Recall | FPR | FNR | P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Prompt injection | 223 | 0.9726 | 0.6174 | 0.0185 | 0.3826 | 0.14 ms |
+| PII | 100 | 1.0000 | 1.0000 | 0.0000 | 0.0000 | 0.05 ms |
+| Tool security | 100 | 0.7463 | 1.0000 | 0.3400 | 0.0000 | 0.30 ms |
+
+The local claim-verifier fallback scored **0.0096 accuracy** and **0.0063 macro F1** across 104 claims (supported F1 0, unsupported F1 0, uncertain F1 0.019). It deliberately returns `uncertain` without a semantic provider rather than infer support from word overlap. This is a clear limitation: useful supported/unsupported classification requires the Groq integration. The live claim benchmark is opt-in with `EVAL_CLAIMS_LIVE=1`; it makes provider calls and is subject to provider quotas. Evidence retrieval metrics were `N/A` because this evaluation run did not query a database.
 
 ## Security considerations
 
@@ -334,4 +344,4 @@ llmguard/
 
 ## Current status
 
-The repository includes the API modules, database schema and migrations, unit and integration test suites, evaluation fixtures, Docker setup, and queue workers. The requirements document describes the target MVP; the current implementation still has gaps, including application-side evidence similarity search and raw scan input persistence described above.
+The repository includes the API modules, database schema and migrations, unit and integration test suites, evaluation fixtures, Docker setup, and queue workers. The API keeps the same security flow: Client → LLM Guard API → security pipeline → risk engine → decision. Verification follows Documents → chunking → embedding → pgvector → evidence retrieval → claim verification. Security modes are `strict`, `balanced`, and `permissive`; tool policies, approval requirements, destructive-operation detection, and optional semantic analysis are enforced at validation time. Scan input is not retained raw.

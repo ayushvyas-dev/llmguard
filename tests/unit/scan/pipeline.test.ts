@@ -4,11 +4,14 @@ import { auditService } from '../../../src/modules/audit/audit.service.js';
 import { scanService } from '../../../src/modules/scan/scan.service.js';
 import { classifySecurity } from '../../../src/integrations/groq/security-classifier.js';
 import { getSecurityPolicy, requestSamplingBucket } from '../../../src/modules/security-policy/security-policy.js';
+import { config } from '../../../src/config/env.js';
 
 vi.mock('../../../src/integrations/groq/security-classifier.js', () => ({ classifySecurity: vi.fn() }));
+const configuredFailureMode = config.CLASSIFIER_FAILURE_MODE;
 
 describe('scan security pipeline', () => {
   beforeEach(() => {
+    config.CLASSIFIER_FAILURE_MODE = configuredFailureMode;
     vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.spyOn(prisma.scan, 'create').mockResolvedValue({ id: 'scan-id', createdAt: new Date() } as never);
@@ -46,6 +49,17 @@ describe('scan security pipeline', () => {
     const saved = vi.mocked(prisma.scan.create).mock.calls[0]?.[0]?.data;
     expect(saved?.input).toContain('INPUT_NOT_RETAINED');
     expect(saved?.input).not.toContain('hello');
+  });
+
+  it.each([
+    ['fail_open', 'allow'],
+    ['fail_closed', 'block'],
+  ] as const)('applies %s when semantic classification fails', async (mode, expectedDecision) => {
+    config.CLASSIFIER_FAILURE_MODE = mode;
+    vi.mocked(classifySecurity).mockRejectedValue(new Error('provider details must not leak'));
+    const result = await scanService.scan({ type: 'prompt', input: 'Summarize this ordinary note.', requestId: `failure-${mode}`, apiKeyId: 'key1', semanticAnalysis: true });
+    expect(result.decision).toBe(expectedDecision);
+    expect(JSON.stringify(result)).not.toContain('provider details must not leak');
   });
 
   it('routes clean text for high-impact operation context in balanced mode', async () => {

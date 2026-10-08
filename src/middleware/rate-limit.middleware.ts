@@ -4,6 +4,21 @@ import { config } from '../config/env.js';
 
 const MAX_REQUESTS = Number(config.RATE_LIMIT_MAX) || 100;
 const WINDOW_SECONDS = Number(config.RATE_LIMIT_WINDOW_SECONDS) || 60;
+const REDIS_TIMEOUT_MS = 500;
+
+async function withRedisTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Rate-limit Redis operation timed out')), REDIS_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export async function rateLimitMiddleware(
   req: Request,
@@ -18,13 +33,13 @@ export async function rateLimitMiddleware(
       'unknown';
 
     const key = `ratelimit:${identifier}`;
-    const current = await redis.incr(key);
+    const current = await withRedisTimeout(redis.incr(key));
 
     if (current === 1) {
-      await redis.expire(key, WINDOW_SECONDS);
+      await withRedisTimeout(redis.expire(key, WINDOW_SECONDS));
     }
 
-    const ttl = await redis.ttl(key);
+    const ttl = await withRedisTimeout(redis.ttl(key));
 
     res.setHeader('X-RateLimit-Limit', MAX_REQUESTS.toString());
     res.setHeader(

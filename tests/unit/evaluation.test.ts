@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runEvaluation } from '../evaluation/evaluate.js';
+import { runClaimVerificationEvaluation, runEvaluation } from '../evaluation/evaluate.js';
 
 describe('Benchmark Evaluation Suite', () => {
   it('runs benchmarks and achieves expected performance thresholds', async () => {
@@ -19,5 +19,17 @@ describe('Benchmark Evaluation Suite', () => {
     expect(metrics['tool_security']?.recall).toBeGreaterThanOrEqual(0.75);
 
     expect(metrics['rules_plus_semantic']).toBeDefined();
+  });
+
+  it('benchmarks the available claim classes and marks unmeasured retrieval metrics N/A', async () => {
+    const metrics = await runClaimVerificationEvaluation();
+    expect(metrics.totalSamples).toBe(104);
+    expect(metrics.perClass['supported']?.support).toBe(51);
+    expect(metrics.perClass['unsupported']?.support).toBe(52);
+    expect(metrics.perClass['uncertain']?.support).toBe(1);
+    expect(metrics.confusionMatrix['uncertain']?.['uncertain']).toBe(1);
+    expect(metrics.evidenceRetrievalPrecision).toBe('N/A');
+    expect(metrics.averageSimilarity).toBe('N/A');
+    expect(metrics.p95RetrievalLatencyMs).toBe('N/A');
   });
 });

@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../../src/app.js';
 import { apiKeyService } from '../../src/modules/api-key/api-key.service.js';
+import { auditService } from '../../src/modules/audit/audit.service.js';
 import prisma from '../../src/config/database.js';
 import * as securityClassifier from '../../src/integrations/groq/security-classifier.js';
 
 describe('Scan API — POST /v1/scan', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(auditService, 'create').mockResolvedValue(undefined);
   });
 
   it('returns 401 when Authorization header is missing', async () => {
@@ -23,6 +25,11 @@ describe('Scan API — POST /v1/scan', () => {
   });
 
   it('blocks prompt injection attacks with high risk score', async () => {
+    vi.spyOn(securityClassifier, 'classifySecurity').mockResolvedValue({
+      latencyMs: 1,
+      status: 200,
+      classification: { isInjection: true, confidence: 0.98, category: 'system_prompt_extraction', attackType: 'direct', severity: 'critical', reason: 'Request seeks hidden instructions.', signals: [] },
+    });
     vi.spyOn(apiKeyService, 'authenticate').mockResolvedValue({
       id: 'd8c7c10b-8d76-4d2c-80a5-f86a9f4c0291',
       name: 'Test Project',
@@ -54,13 +61,18 @@ describe('Scan API — POST /v1/scan', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.decision).toBe('block');
-    expect(res.body.riskLevel).toBe('high');
+    expect(res.body.riskLevel).toBe('critical');
     expect(res.body.riskScore).toBeGreaterThanOrEqual(70);
     expect(res.body.detections.length).toBeGreaterThan(0);
     expect(res.body.detections[0].type).toBe('prompt_injection');
   });
 
   it('allows benign prompts with low risk score', async () => {
+    vi.spyOn(securityClassifier, 'classifySecurity').mockResolvedValue({
+      latencyMs: 1,
+      status: 200,
+      classification: { isInjection: false, confidence: 0.98, category: 'benign_instruction', attackType: 'none', severity: 'low', reason: 'No attack detected.', signals: [] },
+    });
     vi.spyOn(apiKeyService, 'authenticate').mockResolvedValue({
       id: 'd8c7c10b-8d76-4d2c-80a5-f86a9f4c0291',
       name: 'Test Project',

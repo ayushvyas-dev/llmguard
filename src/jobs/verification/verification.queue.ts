@@ -13,5 +13,6 @@ export async function enqueueVerificationJob(data: VerificationJobData): Promise
     await verificationQueue.add('verify-claims', data);
   } catch (error) {
     logger.error({ err: error, jobId: data.verificationJobId }, 'Failed to enqueue verification job to BullMQ');
+    throw error;
   }
 }
