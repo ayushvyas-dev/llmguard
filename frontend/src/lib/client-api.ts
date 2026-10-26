@@ -86,7 +86,7 @@ async function resolveCsrfToken(): Promise<string | null> {
  */
 export const clientApi = new ApiClient({
   baseUrl: "/api/proxy",
-  timeoutMs: 20000,
+  timeoutMs: 60000,
 });
 
 /**
@@ -99,6 +99,7 @@ export async function proxyFetch<T>(
     method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
     body?: unknown;
     params?: Record<string, string | number | boolean | undefined>;
+    timeoutMs?: number;
   } = {}
 ): Promise<T> {
   const method = options.method || "GET";
@@ -121,5 +122,6 @@ export async function proxyFetch<T>(
     body: options.body,
     params: options.params,
     headers,
+    timeoutMs: options.timeoutMs,
   });
 }

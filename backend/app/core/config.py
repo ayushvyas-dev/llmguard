@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     default_rate_limit_rpm: int = Field(default=30, gt=0)
     default_rate_limit_window_seconds: int = Field(default=60, gt=0)
     rate_limit_fail_mode: Literal["open", "closed"] = "open"
-    request_deadline_seconds: float = Field(default=30.0, gt=0)
-    per_attempt_timeout_seconds: float = Field(default=10.0, gt=0)
+    request_deadline_seconds: float = Field(default=60.0, gt=0)
+    per_attempt_timeout_seconds: float = Field(default=35.0, gt=0)
     max_retries: int = Field(default=2, ge=0)
     backoff_base_seconds: float = Field(default=0.5, gt=0)
     backoff_max_seconds: float = Field(default=10.0, gt=0)
