@@ -1,0 +1,26 @@
+[
+  {
+    "provider": "fake",
+    "provider_model_id": "fake-chat",
+    "input_price_per_mtok": 0.50,
+    "output_price_per_mtok": 1.50,
+    "currency": "USD",
+    "source_note": "Seed pricing for fake provider"
+  },
+  {
+    "provider": "groq",
+    "provider_model_id": "openai/gpt-oss-120b",
+    "input_price_per_mtok": 0.59,
+    "output_price_per_mtok": 0.79,
+    "currency": "USD",
+    "source_note": "Groq published pricing"
+  },
+  {
+    "provider": "gemini",
+    "provider_model_id": "gemini-3.5-flash-lite",
+    "input_price_per_mtok": 0.075,
+    "output_price_per_mtok": 0.30,
+    "currency": "USD",
+    "source_note": "Gemini 3.5 Flash Lite pricing"
+  }
+]

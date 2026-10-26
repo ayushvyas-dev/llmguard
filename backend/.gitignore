@@ -1,0 +1,54 @@
+# ==============================================================================
+# LLMGuard Backend .gitignore
+# ==============================================================================
+
+# Environment files & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & Linting caches
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE & Editor configuration
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system artifacts
+.DS_Store
+Thumbs.db
+
+# Logs & temporary run files
+*.log
+dead_letter.log
+/tmp/

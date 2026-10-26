@@ -1,0 +1,109 @@
+# ==============================================================================
+# LLMGuard Root .gitignore
+# Covers Backend (FastAPI/uv), Frontend (Next.js), Testing (Pytest/Playwright)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Secrets & Environment Files
+# ------------------------------------------------------------------------------
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+# Always track template example files
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# ------------------------------------------------------------------------------
+# 2. Python & Virtual Environments (Backend)
+# ------------------------------------------------------------------------------
+.venv/
+**/.venv/
+venv/
+**/venv/
+ENV/
+env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ------------------------------------------------------------------------------
+# 3. Node.js & Frontend (Next.js)
+# ------------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js build and cache output
+.next/
+**/.next/
+out/
+**/out/
+.vercel/
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# 4. Testing & Code Quality Caches
+# ------------------------------------------------------------------------------
+# Python (Pytest / Ruff / Coverage)
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+**/coverage/
+coverage.xml
+nosetests.xml
+
+# Playwright & Vitest
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# ------------------------------------------------------------------------------
+# 5. Logs & Temporary Files
+# ------------------------------------------------------------------------------
+*.log
+*.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dead_letter.log
+tmp/
+/tmp/
+
+# ------------------------------------------------------------------------------
+# 6. IDE, Editors & OS Artifacts
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+**/.idea/
+.vscode/
+**/.vscode/
+*.swp
+*.swo
+*~

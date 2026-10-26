@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "mode": "enforce",
+  "max_concurrency": 4,
+  "store_content": false,
+  "allowed_tools": [],
+  "custom_regex_entities": {},
+  "cacheable": true,
+  "detectors": {
+    "prompt_injection": {"block_threshold": 0.75},
+    "jailbreak": {"block_threshold": 0.75},
+    "pii": {"redact_threshold": 0.5, "block_threshold": 1.0},
+    "secrets": {"block_threshold": 0.7},
+    "output": {"enabled": true, "block_threshold": 0.7}
+  }
+}

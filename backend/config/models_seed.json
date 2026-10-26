@@ -1,0 +1,5 @@
+[
+  {"alias": "default-chat", "provider": "fake", "provider_model_id": "fake-chat", "capabilities": {"streaming": false}, "enabled": true},
+  {"alias": "groq-chat", "provider": "groq", "provider_model_id": "openai/gpt-oss-120b", "capabilities": {"streaming": true, "tools": true, "json_mode": true}, "enabled": true},
+  {"alias": "gemini-chat", "provider": "gemini", "provider_model_id": "gemini-3.5-flash-lite", "capabilities": {"streaming": true, "tools": true, "json_mode": true}, "enabled": true}
+]

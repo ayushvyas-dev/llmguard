@@ -1,0 +1,51 @@
+# ==============================================================================
+# LLMGuard Backend .dockerignore
+# ==============================================================================
+
+# Secrets and environment files
+.env*
+!.env.example
+
+# Git metadata
+.git
+.gitignore
+.github
+
+# Python bytecode and caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Local virtual environment
+.venv
+venv
+ENV
+env
+
+# Tests and testing artifacts (keep production image lightweight)
+tests
+.pytest_cache
+.ruff_cache
+.hypothesis
+.coverage
+.coverage.*
+htmlcov
+coverage.xml
+
+# IDE & Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# System and logs
+*.log
+.DS_Store
+Thumbs.db
+
+# Documentation and scratch files
+docs
+*.md
+!README.md
