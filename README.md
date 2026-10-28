@@ -454,9 +454,21 @@ uv run pip-audit
 
 ---
 
+### Benchmark & Reliability Reports
+
+LLMGuard maintains reproducible benchmark suites spanning security inspection accuracy, high-concurrency performance, provider resilience, and reliability regression testing:
+
+- **Executive Summary & Overview**: [`docs/reports/benchmark_summary.md`](docs/reports/benchmark_summary.md)
+- **Security Evaluation (178 test cases)**: [`docs/reports/security_eval.md`](docs/reports/security_eval.md)
+- **Load & Concurrency (18,000 requests)**: [`docs/reports/load_test_report.md`](docs/reports/load_test_report.md)
+- **Resilience & Fallback (100 executions)**: [`docs/reports/resilience_and_fallback.md`](docs/reports/resilience_and_fallback.md)
+- **Reliability & Regressions (278 automated tests)**: [`docs/reports/reliability_and_regression.md`](docs/reports/reliability_and_regression.md)
+
+---
+
 ### Security Evaluation Benchmark
 
-Evaluates detector recall, precision, and false-positive rates (FPR) across adversarial prompt injection and jailbreak datasets:
+Evaluates detector recall, precision, and false-positive rates (FPR) across adversarial prompt injection, jailbreak, sensitive PII, and secret leak datasets:
 
 ```bash
 cd backend
@@ -468,10 +480,14 @@ uv run python -m tests.security_eval.run --dataset all --report ../docs/reports/
 
 ### Resilience & Fallback Failure Injection
 
-Simulates transient 503s, downstream network timeouts, and cascading provider outages to verify that circuit breakers trip and requests fallback cleanly within deadline budgets:
+Simulates transient 503s, 500 internal errors, 429 rate limits, downstream network timeouts, and cascading provider outages to verify that circuit breakers trip and requests fallback cleanly without bypassing security checks:
 
 ```bash
 cd backend
+# Comprehensive 10-scenario, 10-repetition benchmark suite
+uv run python -m tests.resilience.run_resilience_benchmark --report ../docs/reports/resilience_and_fallback.md --reps 10
+
+# Or standard integration test
 uv run pytest tests/integration/test_failure_injection.py -v
 ```
 *Full report generated at: [`docs/reports/resilience_and_fallback.md`](docs/reports/resilience_and_fallback.md)*
@@ -480,13 +496,13 @@ uv run pytest tests/integration/test_failure_injection.py -v
 
 ### Load & Concurrency Testing
 
-Simulates high-concurrency client workloads (10 to 50 concurrent virtual users) to measure throughput (RPS), p50/p95/p99 latencies, and gateway internal overhead:
+Simulates high-concurrency client workloads (10 to 50 concurrent virtual users) to measure throughput (RPS), p50/p90/p95/p99 latencies, error rates, timeout rates, and security pipeline overhead across cache-enabled and cache-disabled scenarios:
 
 ```bash
 cd backend
 
-# Automated headless load test runner
-uv run python -m tests.load.run_load_test --report ../docs/reports/load_test_report.md
+# Automated headless load test runner (18,000 requests across concurrency levels 10, 25, 50)
+uv run python -m tests.load.run_load_test --requests 1000 --runs 3 --report ../docs/reports/load_test_report.md
 
 # Or interactive Locust dashboard
 uv run locust -f tests/load/locustfile.py --host http://localhost:8000

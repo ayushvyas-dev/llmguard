@@ -210,5 +210,6 @@ async def test_failure_injection_and_fallback_success_rate(failure_injection_env
 
     report_path = Path(__file__).parents[3] / "docs" / "reports" / "resilience_and_fallback.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("\n".join(report_lines))
+    if not report_path.exists() or "Total Test Executions" not in report_path.read_text():
+        report_path.write_text("\n".join(report_lines))
     assert report_path.exists()
