@@ -69,63 +69,60 @@
 
 LLMGuard employs a layered, zero-trust architecture separating client edge traffic, core security orchestration, upstream provider integration, and administrative controls.
 
-```
-+-----------------------------------------------------------------------------------+
-|                                  Client Layer                                     |
-|  [ External API Consumers / SDKs ]           [ Next.js Admin Console (Port 3000) ]|
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼ HTTPS / JSON
-+-----------------------------------------------------------------------------------+
-|                        Edge & Gateway Middleware (FastAPI)                        |
-|  - Correlation ID (X-Correlation-ID)          - Body Size Guard (10MB Max)        |
-|  - Security Headers (HSTS, CSP, XFO)          - Structured JSON Logging           |
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                           Authentication & Rate Limiting                          |
-|  - Tenant API Key Authentication (SHA-256 + Pepper)                               |
-|  - Sliding-Window Rate Limiter (Redis 7+ / In-Memory Fallback)                    |
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                               Security Engine                                     |
-|  1. Text Normalization (NFKC, Homoglyphs, Invisible Characters)                   |
-|  2. Heuristic Rule Detectors (Prompt Injection, Jailbreaks)                       |
-|  3. Secret & PII Scanning (Entropy, Regex, Luhn Checksum)                         |
-|  4. Dynamic Policy Evaluation (ALLOW / MASK / BLOCK / LOG)                        |
-+-----------------------------------------------------------------------------------+
-                                         │
-                        [ Cache Hit ]    ▼    [ Cache Miss ]
-       ┌─────────────────────────────── ( ? ) ──────────────────────────────┐
-       ▼                                                                    ▼
-[ Semantic Cache ]                                           [ Gateway Router & Resilience ]
-(Redis SHA-256 Key)                                          - Model Catalog Resolution
-       │                                                     - Circuit Breaker Checks
-       │                                                     - Jittered Backoff Retries
-       │                                                     - Dynamic Provider Fallback
-       │                                                                    │
-       │                                                                    ▼
-       │                                                         [ Upstream Providers ]
-       │                                                         - Groq API
-       │                                                         - Google Gemini API
-       │                                                         - Fake / Mock Provider
-       │                                                                    │
-       │                                                                    ▼
-       │                                                         [ Output Guardrails ]
-       │                                                         - PII & Secret Redaction
-       │                                                         - Leakage Verification
-       │                                                                    │
-       └───────────────────────────────┬────────────────────────────────────┘
-                                       ▼
-+-----------------------------------------------------------------------------------+
-|                              Response & Audit Telemetry                           |
-|  - OpenAI-compatible Response Formatted and Returned to Caller                    |
-|  - Async Background Worker: Flush Traces & Usage Records -> PostgreSQL            |
-|  - Dead Letter Queue (DLQ) Safeguard on DB Disconnection                          |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+  subgraph Client Tier
+    Browser[Browser / Engineer]
+    CLI[cURL / API Client]
+  end
+
+  subgraph Frontend Application [Next.js App Router - Port 3000]
+    UI[Web Dashboard]
+    Proxy[Secure Same-Origin API Proxy\n/api/backend/*]
+    UI --> Proxy
+  end
+
+  subgraph Backend Application [FastAPI - Port 8000]
+    API[FastAPI Gateway\nAuth, Rate Limiting, Validation]
+    Router[Model Routing & Circuit Breaker]
+    Fusion[Hybrid Retrieval & Ranking Engine]
+  end
+
+  subgraph Storage & Queues
+    DB[(NeonDB PostgreSQL\nCanonical Chunks, Incidents, Jobs, FTS)]
+    VStore[(Pinecone Vector DB\nEmbeddings Index)]
+    Queue[(Redis / ARQ Queue)]
+  end
+
+  subgraph Async Workers
+    Worker[ARQ Background Worker\nDocument Chunking & Indexing]
+  end
+
+  subgraph External AI Services
+    GeminiEmbed[Gemini Embedding API]
+    GroqLLM[Groq Chat API - Primary]
+    GeminiLLM[Gemini Chat API - Fallback]
+  end
+
+  Browser --> UI
+  Proxy --> API
+  CLI --> API
+
+  API <--> DB
+  API <--> VStore
+  API --> Queue
+  Queue --> Worker
+
+  Worker <--> DB
+  Worker --> GeminiEmbed
+  GeminiEmbed --> VStore
+
+  API --> Router
+  Router --> GroqLLM
+  Router -. Fallback .-> GeminiLLM
+  API --> Fusion
+  Fusion <--> DB
+  Fusion <--> VStore
 ```
 
 ---
