@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, User } from "lucide-react";
+import { useDemoMode } from "./demo-banner";
 
 interface HeaderProps {
   title?: string;
@@ -20,9 +21,13 @@ export function Header({ title }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const displayTitle = title || titleMap[pathname] || "Dashboard";
+  const { isDemoMode } = useDemoMode();
 
   const handleLogout = async () => {
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("llmguard_demo_session");
+      }
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       router.push("/login");
@@ -43,14 +48,18 @@ export function Header({ title }: HeaderProps) {
           <span>PRODUCTION</span>
         </div>
 
-        {/* Admin Session Badge */}
+        {/* User Session Badge */}
         <div className="flex items-center gap-2 pl-2 border-l border-white/10">
           <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-300">
             <User className="w-4 h-4" />
           </div>
           <div className="hidden sm:block text-left">
-            <div className="text-xs font-medium text-slate-200">Admin User</div>
-            <div className="text-[10px] text-slate-500">Super Administrator</div>
+            <div className="text-xs font-medium text-slate-200">
+              {isDemoMode ? "Demo User" : "Admin User"}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {isDemoMode ? "Demo Access" : "Super Administrator"}
+            </div>
           </div>
         </div>
 

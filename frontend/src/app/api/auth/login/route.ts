@@ -6,7 +6,12 @@ import { createSessionToken, getSessionCookieConfig } from "@/lib/session";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const adminKey = body?.adminKey?.trim();
+    const isDemo = body?.isDemo === true;
+    let adminKey = body?.adminKey?.trim();
+
+    if (isDemo && !adminKey) {
+      adminKey = process.env.DEMO_ADMIN_KEY || "lga_dev_demo0000_recruiter_demo_access_key";
+    }
 
     if (!adminKey) {
       return NextResponse.json(

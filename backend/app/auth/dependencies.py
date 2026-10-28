@@ -1,11 +1,12 @@
-"""FastAPI dependencies for gateway and admin authentication."""
+from uuid import UUID
 
 from fastapi import Depends, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.service import AuthFailure, AuthResult, authenticate
 from app.core.errors import GatewayError
-from app.db.models import KeyRole
+from app.db.models import ApiKey, Client, ClientStatus, KeyRole, KeyStatus
 
 
 async def _get_session(request: Request) -> AsyncSession:
@@ -79,26 +80,65 @@ async def require_admin_auth(
     request: Request,
     session: AsyncSession = Depends(_get_session),
 ) -> AuthResult:
-    """Dependency for admin endpoints — requires a valid admin key."""
+    """Dependency for admin endpoints — requires a valid admin key or demo key."""
     token = _extract_bearer(request)
-    pepper = request.app.state.settings.api_key_pepper or ""
-    result = await authenticate(token, pepper, session)
+    settings = getattr(request.app.state, "settings", None)
+    demo_key = (
+        getattr(settings, "demo_admin_key", "lga_dev_demo0000_recruiter_demo_access_key")
+        if settings
+        else "lga_dev_demo0000_recruiter_demo_access_key"
+    )
 
-    if isinstance(result, AuthFailure):
-        raise _auth_failure_to_error(result)
-
-    # Only admin keys can access admin endpoints
-    if result.role != KeyRole.ADMIN:
-        raise GatewayError(
-            403,
-            "forbidden",
-            "This endpoint requires admin credentials.",
-            "authentication_error",
+    if demo_key and token == demo_key:
+        res = await session.execute(
+            select(Client)
+            .join(ApiKey)
+            .where(ApiKey.role == KeyRole.ADMIN, Client.status == ClientStatus.ACTIVE)
+            .limit(1)
         )
+        admin_client = res.scalar_one_or_none()
+        if admin_client is None:
+            res = await session.execute(
+                select(Client).where(Client.status == ClientStatus.ACTIVE).limit(1)
+            )
+            admin_client = res.scalar_one_or_none()
+
+        if admin_client is None:
+            admin_client = Client(
+                id=UUID("00000000-0000-0000-0000-000000000001"),
+                name="demo-recruiter",
+                status=ClientStatus.ACTIVE,
+            )
+
+        demo_key_obj = ApiKey(
+            id=UUID("00000000-0000-0000-0000-000000000002"),
+            client_id=admin_client.id,
+            prefix="demo0000",
+            key_hash=b"",
+            role=KeyRole.ADMIN,
+            status=KeyStatus.ACTIVE,
+            label="Demo Recruiter Key",
+        )
+        result = AuthResult(admin_client, demo_key_obj)
+    else:
+        pepper = getattr(settings, "api_key_pepper", "") if settings else ""
+        result = await authenticate(token, pepper, session)
+
+        if isinstance(result, AuthFailure):
+            raise _auth_failure_to_error(result)
+
+        # Only admin keys can access admin endpoints
+        if result.role != KeyRole.ADMIN:
+            raise GatewayError(
+                403,
+                "forbidden",
+                "This endpoint requires admin credentials.",
+                "authentication_error",
+            )
 
     # In demo mode, block all administrative mutations except playground completions
-    settings = getattr(request.app.state, "settings", None)
-    if settings and getattr(settings, "demo_mode", False):
+    is_demo = (settings and getattr(settings, "demo_mode", False)) or (result.prefix == "demo0000")
+    if is_demo:
         if request.method in ("POST", "PUT", "PATCH", "DELETE") and not request.url.path.endswith(
             "/playground/completions"
         ):

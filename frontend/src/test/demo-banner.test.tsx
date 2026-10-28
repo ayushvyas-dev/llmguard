@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DemoBanner } from "../components/demo-banner";
 import * as clientApiModule from "../lib/client-api";
@@ -18,7 +18,7 @@ describe("Demo Mode Banner (UI-009)", () => {
     });
   });
 
-  it("renders amber banner when demo mode is true", async () => {
+  it("renders amber banner when demo mode is true and dismisses on click", async () => {
     vi.spyOn(clientApiModule, "proxyFetch").mockResolvedValue({ demo_mode: true });
 
     render(<DemoBanner />);
@@ -28,5 +28,9 @@ describe("Demo Mode Banner (UI-009)", () => {
     expect(
       screen.getByText(/Administrative mutations \(creating\/editing clients, keys, and policies\) are disabled/i)
     ).toBeInTheDocument();
+
+    const dismissBtn = screen.getByRole("button", { name: "Dismiss banner" });
+    fireEvent.click(dismissBtn);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

@@ -404,3 +404,30 @@ class TestAdminDemoMode:
 
         # Restore
         app.state.settings.demo_mode = False
+
+    async def test_demo_admin_key_allows_read_and_blocks_mutations(self, admin_env):
+        client: httpx.AsyncClient = admin_env["http"]
+        app = client._transport.app
+        demo_key = app.state.settings.demo_admin_key
+        headers = {"Authorization": f"Bearer {demo_key}"}
+
+        # System mode returns demo_mode = True when using demo key
+        mode_res = await client.get("/api/v1/admin/system/mode", headers=headers)
+        assert mode_res.status_code == 200
+        assert mode_res.json() == {"demo_mode": True}
+
+        # Read requests succeed
+        get_res = await client.get("/api/v1/admin/clients", headers=headers)
+        assert get_res.status_code == 200
+
+        overview_res = await client.get("/api/v1/admin/metrics/overview", headers=headers)
+        assert overview_res.status_code == 200
+
+        # Mutation requests are blocked with 403 demo_mode_restricted
+        post_res = await client.post(
+            "/api/v1/admin/clients",
+            json={"name": "demo-key-blocked-client"},
+            headers=headers,
+        )
+        assert post_res.status_code == 403
+        assert post_res.json()["error"]["code"] == "demo_mode_restricted"

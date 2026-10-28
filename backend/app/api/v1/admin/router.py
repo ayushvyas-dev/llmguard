@@ -30,6 +30,8 @@ async def get_system_mode(
     """Return whether the gateway is running in demo mode."""
     settings = getattr(request.app.state, "settings", None)
     demo_mode = getattr(settings, "demo_mode", False) if settings else False
+    if _admin.prefix == "demo0000":
+        demo_mode = True
     return {"demo_mode": bool(demo_mode)}
 
 

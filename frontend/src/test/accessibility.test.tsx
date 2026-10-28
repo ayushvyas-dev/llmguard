@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import LoginPage from "../app/login/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -24,6 +24,10 @@ describe("Accessibility Standards & Keyboard Navigation (F5)", () => {
     // Submit button has accessible name
     const submitBtn = screen.getByRole("button", { name: "Sign In to Dashboard" });
     expect(submitBtn).toBeInTheDocument();
+
+    // 1-Click Recruiter Demo button has accessible name
+    const demoBtn = screen.getByRole("button", { name: "Explore Live Demo (1-Click Access)" });
+    expect(demoBtn).toBeInTheDocument();
   });
 
   it("ConfirmDialog enforces modal accessibility attributes (role=dialog, aria-modal, aria-labelledby)", () => {
@@ -50,8 +54,10 @@ describe("Accessibility Standards & Keyboard Navigation (F5)", () => {
     expect(closeBtn).toBeInTheDocument();
   });
 
-  it("Header includes navigation landmark, heading, and logout button label", () => {
-    render(<Header />);
+  it("Header includes navigation landmark, heading, and logout button label", async () => {
+    await act(async () => {
+      render(<Header />);
+    });
 
     // Header has a level 1 heading
     const headerHeading = screen.getByRole("heading", { level: 1 });

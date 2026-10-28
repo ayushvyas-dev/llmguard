@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     cache_schema_version: int = Field(default=1, gt=0)
     routing_version: int = Field(default=1, gt=0)
     demo_mode: bool = False
+    demo_admin_key: str = "lga_dev_demo0000_recruiter_demo_access_key"
 
     @field_validator("database_url", "database_url_direct", "redis_url", mode="before")
     @classmethod

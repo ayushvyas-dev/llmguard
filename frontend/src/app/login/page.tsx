@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, KeyRound, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { setClientCsrfToken } from "@/lib/client-api";
 
 export default function LoginPage() {
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [adminKey, setAdminKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +37,11 @@ export default function LoginPage() {
         throw new Error(data.error || "Authentication failed. Check your admin API key.");
       }
 
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("llmguard_demo_session");
+        sessionStorage.removeItem("llmguard_demo_banner_seen");
+      }
+
       if (data.csrfToken) {
         setClientCsrfToken(data.csrfToken);
       }
@@ -46,6 +52,44 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError(null);
+    setDemoLoading(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isDemo: true,
+          adminKey: "lga_dev_demo0000_recruiter_demo_access_key",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to initialize demo access.");
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("llmguard_demo_session", "true");
+        sessionStorage.removeItem("llmguard_demo_banner_seen");
+      }
+
+      if (data.csrfToken) {
+        setClientCsrfToken(data.csrfToken);
+      }
+
+      router.push(from);
+      router.refresh();
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred entering demo mode."
+      );
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -78,7 +122,10 @@ export default function LoginPage() {
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="adminKey" className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+            <label
+              htmlFor="adminKey"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2"
+            >
               Admin API Key
             </label>
             <div className="relative">
@@ -92,7 +139,7 @@ export default function LoginPage() {
                 onChange={(e) => setAdminKey(e.target.value)}
                 placeholder="Enter admin key..."
                 className="w-full glass-input rounded-xl pl-10 pr-12 py-3 text-sm focus:border-indigo-500 transition-all font-mono"
-                disabled={loading}
+                disabled={loading || demoLoading}
                 autoFocus
                 autoComplete="off"
               />
@@ -113,13 +160,20 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || demoLoading}
             className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? (
               <>
                 <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
                 <span>Verifying credentials...</span>
@@ -129,6 +183,48 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#0e1422] px-3 text-slate-400 font-medium">Or explore as reviewer</span>
+          </div>
+        </div>
+
+        {/* 1-Click Recruiter / Demo Access Button */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={loading || demoLoading}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600/20 via-teal-600/20 to-cyan-600/20 hover:from-emerald-600/30 hover:via-teal-600/30 hover:to-cyan-600/30 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 hover:text-emerald-200 font-medium text-sm transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
+          >
+            {demoLoading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span>Loading Demo Gateway...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span>Explore Live Demo (1-Click Access)</span>
+              </>
+            )}
+          </button>
+        </div>
 
         {/* Security Notice */}
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
